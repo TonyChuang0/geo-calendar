@@ -146,9 +146,23 @@ async function loadFromSheet() {
     events.sort((a,b) => a.date.localeCompare(b.date));
     buildCalendar();
     const now = new Date();
-    document.getElementById('refreshInfo').textContent = `已刷新 ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+    document.getElementById('refreshInfo').textContent = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')} (Sheet)`;
   } catch(e) {
-    console.error('加载失败', e);
+    // Fallback: offline or CORS blocked (e.g. file://)
+    events = parseCSV(`类型,日期,结束日期,标题,描述
+新品,2026-07-15,,2L冷榨芥花籽油、500ml特级初榨芥花籽油,
+新品,2026-07-15,,500ml特级初榨橄榄油、4L特级初榨橄榄油,
+促销,2026-08-01,,中秋促销启动,京东活动报名 · 礼盒优先 · 小红书种草
+展会,2026-09-03,2026-09-05,Sial 广州食品展,TIQ暂定 · 进口食品专业展
+新品,2026-09-15,,500ml牛油果油、500ml礼盒装,
+节日,2026-09-25,,中秋节,促销收尾 · 礼品渠道冲刺
+展会,2026-10-20,2026-10-23,深圳礼品展秋季,友商联合 · 礼盒/集采渠道
+展会,2026-11-05,2026-11-10,上海进博会 CIIE,全年最重要 · 国家馆背书
+促销,2026-12-15,,春节促销启动,年货季 · 礼盒+4L双线 · 京东年货节
+节日,2027-02-06,,春节,促销收尾`);
+    events.sort((a,b) => a.date.localeCompare(b.date));
+    buildCalendar();
+    document.getElementById('refreshInfo').textContent = '离线模式（内置数据）';
   }
 }
 
