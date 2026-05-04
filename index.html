@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEO 2026 H2 关键节点 · 挂历看板</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f8f7f4; color: #1a1a1a; padding: 32px 4%; }
+
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+  .header-left h1 { font-size: 26px; font-weight: 700; }
+  .sub { color: #999; font-size: 13px; margin-bottom: 20px; }
+  .header-logo { max-height: 84px; width: auto; }
+
+  .toolbar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+  .btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; font-size: 13px; cursor: pointer; font-family: inherit; transition: all .15s; }
+  .btn:hover { background: #f3f4f6; }
+  .btn.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .btn.primary:hover { background: #1d4ed8; }
+  .btn.danger { color: #ef4444; border-color: #fecaca; }
+  .btn.danger:hover { background: #fef2f2; }
+  .btn.small { padding: 4px 10px; font-size: 12px; }
+
+  .legend { display: flex; gap: 20px; margin-bottom: 24px; font-size: 13px; align-items: center; flex-wrap: wrap; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .l-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .l-dot.expo { background: #2563eb; } .l-dot.promo { background: #f59e0b; }
+  .l-dot.fest { background: #ef4444; } .l-dot.newp { background: #10b981; }
+
+  /* Edit Panel */
+  .edit-panel { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.05); display: none; }
+  .edit-panel.show { display: block; }
+  .edit-panel h3 { font-size: 16px; margin-bottom: 16px; }
+  .form-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .form-row input, .form-row select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; font-family: inherit; }
+  .form-row input[type="date"] { width: 150px; }
+  .form-row input[type="text"] { flex: 1; min-width: 200px; }
+
+  .event-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; }
+  .event-table th { text-align: left; padding: 10px 12px; background: #f9fafb; color: #6b7280; font-weight: 500; border-bottom: 1px solid #e5e7eb; }
+  .event-table td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+  .event-table .type-dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
+  .type-dot.expo { background: #2563eb; } .type-dot.promo { background: #f59e0b; }
+  .type-dot.fest { background: #ef4444; } .type-dot.newp { background: #10b981; }
+  .row-actions { display: flex; gap: 6px; }
+
+  /* Calendar */
+  .calendar { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+
+  .month { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .month-header { padding: 14px 18px; font-size: 16px; font-weight: 700; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
+  .month-header .year { font-size: 12px; color: #999; font-weight: 400; }
+
+  .month-body { padding: 8px 10px; }
+  .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; color: #aaa; padding: 4px 0 6px; }
+  .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .day { aspect-ratio: 1; display: flex; align-items: flex-start; justify-content: center; padding: 3px 0 0; font-size: 13px; border-radius: 6px; position: relative; }
+  .day.empty { visibility: hidden; }
+  .day .num { position: relative; z-index: 1; }
+  .day.circled .num::after {
+    content: ''; position: absolute; top: -4px; left: -8px;
+    width: calc(100% + 16px); height: calc(100% + 8px);
+    border-radius: 45% 48% 47% 44%; border: 2.5px solid;
+    transform: rotate(-3deg);
+  }
+  .day.circled.expo .num::after { border-color: #2563eb; }
+  .day.circled.promo .num::after { border-color: #f59e0b; }
+  .day.circled.fest .num::after { border-color: #ef4444; }
+  .day.circled.newp .num::after { border-color: #10b981; }
+  .day.multi { position: relative; }
+  .day.multi .ring { position: absolute; top: -3px; left: -7px; width: calc(100% + 14px); height: calc(100% + 6px); border-radius: 47% 44% 45% 46%; border: 2.5px solid; }
+  .day.multi .ring.r1 { top: -5px; left: -9px; width: calc(100% + 18px); height: calc(100% + 10px); transform: rotate(2deg); border-radius: 44% 47% 43% 46%; }
+  .day.multi .ring.r2 { top: -1px; left: -5px; width: calc(100% + 10px); height: calc(100% + 2px); transform: rotate(-4deg); border-radius: 48% 43% 46% 44%; }
+  .day.multi .ring.expo { border-color: #2563eb; }
+  .day.multi .ring.promo { border-color: #f59e0b; }
+  .day.multi .ring.fest { border-color: #ef4444; }
+  .day.multi .ring.newp { border-color: #10b981; }
+
+  .events-panel { padding: 12px 18px 16px; border-top: 1px solid #f0f0f0; }
+  .evt { font-size: 12px; padding: 4px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .evt .e-dot { width: 8px; height: 8px; border-radius: 2px; margin-top: 3px; flex-shrink: 0; }
+  .e-dot.expo { background: #2563eb; } .e-dot.promo { background: #f59e0b; }
+  .e-dot.fest { background: #ef4444; } .e-dot.newp { background: #10b981; }
+
+  .summary { margin-top: 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .s-card { background: #fff; border-radius: 10px; padding: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .s-card h3 { font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .s-card p { font-size: 13px; color: #555; line-height: 1.7; }
+
+  .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1f2937; color: #fff; padding: 10px 24px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .3s; z-index: 100; }
+  .toast.show { opacity: 1; }
+
+  @media print { body { padding: 16px; } .toolbar, .edit-panel { display: none !important; } .month { box-shadow: none; border: 1px solid #e5e5e5; break-inside: avoid; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>GEO 2026 H2 关键节点</h1>
+    <p class="sub">展会 · 促销 · 节日 · 新品 | 点击「编辑」增删改项目，自动更新挂历</p>
+  </div>
+  <img class="header-logo" src="GEO_logo.png" alt="Good Earth Oils">
+</div>
+
+<div class="toolbar">
+  <button class="btn primary" onclick="toggleEdit()" id="editBtn">✏️ 编辑</button>
+  <button class="btn" onclick="exportJSON()">📤 导出 JSON</button>
+  <button class="btn" onclick="document.getElementById('importFile').click()">📥 导入 JSON</button>
+  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+  <button class="btn" onclick="window.print()">🖨️ 打印</button>
+</div>
+
+<div class="legend">
+  <span><span class="l-dot expo"></span> 展会</span>
+  <span><span class="l-dot promo"></span> 促销</span>
+  <span><span class="l-dot fest"></span> 节日</span>
+  <span><span class="l-dot newp"></span> 新品到仓</span>
+</div>
+
+<!-- Edit Panel -->
+<div class="edit-panel" id="editPanel">
+  <h3>📝 编辑节点</h3>
+  <div class="form-row">
+    <select id="editType"><option value="expo">展会</option><option value="promo">促销</option><option value="fest">节日</option><option value="newp">新品到仓</option></select>
+    <input type="date" id="editDate" placeholder="日期">
+    <input type="date" id="editEndDate" placeholder="结束日期（可空）">
+    <input type="text" id="editTitle" placeholder="标题（如：深圳礼品展秋季）">
+    <input type="text" id="editDesc" placeholder="描述（可空）">
+    <button class="btn primary" onclick="addEvent()">➕ 添加</button>
+  </div>
+  <table class="event-table" id="eventTable">
+    <thead><tr><th>类型</th><th>日期</th><th>结束</th><th>标题</th><th>描述</th><th>操作</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div class="calendar" id="calendar"></div>
+
+<div class="summary" id="summary"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const TYPE_LABELS = { expo: '展会', promo: '促销', fest: '节日', newp: '新品' };
+
+const DEFAULT_DATA = [
+  { type: 'newp', date: '2026-07-15', endDate: '', title: '2L冷榨芥花籽油 · 500ml特级初榨芥花籽油', desc: '' },
+  { type: 'newp', date: '2026-07-15', endDate: '', title: '500ml特级初榨橄榄油 · 4L特级初榨橄榄油', desc: '' },
+  { type: 'promo', date: '2026-08-01', endDate: '', title: '中秋促销启动', desc: '京东活动报名 · 礼盒优先 · 小红书种草' },
+  { type: 'expo', date: '2026-09-03', endDate: '2026-09-05', title: 'Sial 广州食品展', desc: 'TIQ暂定 · 进口食品专业展' },
+  { type: 'newp', date: '2026-09-15', endDate: '', title: '500ml牛油果油 · 500ml礼盒装', desc: '' },
+  { type: 'fest', date: '2026-09-25', endDate: '', title: '中秋节', desc: '促销收尾 · 礼品渠道冲刺' },
+  { type: 'expo', date: '2026-10-20', endDate: '2026-10-23', title: '深圳礼品展秋季', desc: '友商联合 · 礼盒/集采渠道' },
+  { type: 'expo', date: '2026-11-05', endDate: '2026-11-10', title: '上海进博会 CIIE', desc: '全年最重要 · 国家馆背书' },
+  { type: 'promo', date: '2026-12-15', endDate: '', title: '春节促销启动', desc: '年货季 · 礼盒+4L双线 · 京东年货节' },
+  { type: 'fest', date: '2027-02-06', endDate: '', title: '春节', desc: '促销收尾' },
+];
+
+let events = loadData();
+
+function loadData() {
+  try {
+    const saved = localStorage.getItem('geo_calendar_data');
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_DATA));
+}
+
+function saveData() {
+  localStorage.setItem('geo_calendar_data', JSON.stringify(events));
+}
+
+function getMonthKey(y, m) { return `${y}-${m}`; }
+
+function buildCalendar() {
+  // Determine month range from events
+  let minDate = null, maxDate = null;
+  events.forEach(e => {
+    const d = new Date(e.date + 'T00:00:00');
+    if (!minDate || d < minDate) minDate = d;
+    if (!maxDate || d > maxDate) maxDate = d;
+    if (e.endDate) {
+      const ed = new Date(e.endDate + 'T00:00:00');
+      if (ed > maxDate) maxDate = ed;
+    }
+  });
+  if (!minDate || !maxDate) return;
+
+  // Extend to month boundaries
+  let startY = minDate.getFullYear(), startM = minDate.getMonth() + 1;
+  let endY = maxDate.getFullYear(), endM = maxDate.getMonth() + 1;
+
+  // Build month data
+  const months = [];
+  let y = startY, m = startM;
+  while (y < endY || (y === endY && m <= endM)) {
+    months.push({ year: y, month: m });
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+
+  // Index events by date string (single day) + range
+  const dayMarkers = {}; // "2026-07-15" => ['newp','newp']
+  const monthEvents = {}; // "2026-7" => [{type,date,endDate,title,desc}]
+  events.forEach(e => {
+    const mk = `${new Date(e.date+'T00:00:00').getFullYear()}-${new Date(e.date+'T00:00:00').getMonth()+1}`;
+    if (!monthEvents[mk]) monthEvents[mk] = [];
+    monthEvents[mk].push(e);
+
+    // Mark days
+    if (!dayMarkers[e.date]) dayMarkers[e.date] = [];
+    if (!dayMarkers[e.date].includes(e.type)) dayMarkers[e.date].push(e.type);
+
+    if (e.endDate) {
+      const start = new Date(e.date + 'T00:00:00');
+      const end = new Date(e.endDate + 'T00:00:00');
+      const cur = new Date(start);
+      cur.setDate(cur.getDate() + 1);
+      while (cur <= end) {
+        const ds = cur.toISOString().slice(0,10);
+        if (!dayMarkers[ds]) dayMarkers[ds] = [];
+        if (!dayMarkers[ds].includes(e.type)) dayMarkers[ds].push(e.type);
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
+  });
+
+  const weekdays = ['一','二','三','四','五','六','日'];
+  const monthNames = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+
+  let html = '';
+  months.forEach(({year, month}) => {
+    const mk = getMonthKey(year, month);
+    const mEvts = monthEvents[mk] || [];
+    const firstDay = new Date(year, month-1, 1).getDay(); // 0=Sun
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const adjFirstDay = firstDay === 0 ? 6 : firstDay - 1; // Mon=0
+
+    html += `<div class="month">`;
+    html += `<div class="month-header">${monthNames[month-1]}月 <span class="year">${year}</span></div>`;
+    html += `<div class="month-body">`;
+    html += `<div class="weekdays">${weekdays.map(w=>`<span>${w}</span>`).join('')}</div>`;
+    html += `<div class="days">`;
+
+    for (let i = 0; i < adjFirstDay; i++) html += `<span class="day empty"></span>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const markers = dayMarkers[ds] || [];
+      let cls = 'day';
+      let inner = `<span class="num">${d}</span>`;
+      if (markers.length === 1) {
+        cls += ' circled ' + markers[0];
+      } else if (markers.length > 1) {
+        cls += ' multi';
+        const rings = markers.map((t,i) => `<span class="ring r${i+1} ${t}"></span>`).join('');
+        inner = rings + `<span class="num">${d}</span>`;
+      }
+      html += `<span class="${cls}">${inner}</span>`;
+    }
+    html += `</div></div>`;
+
+    html += `<div class="events-panel">`;
+    if (mEvts.length > 0) {
+      mEvts.forEach(e => {
+        const dateStr = formatDateRange(e.date, e.endDate);
+        html += `<div class="evt"><span class="e-dot ${e.type}"></span> ${dateStr} ${e.title}${e.desc ? ' —— ' + e.desc : ''}</div>`;
+      });
+    } else {
+      html += `<div class="evt" style="color:#ccc;font-style:italic">暂无节点</div>`;
+    }
+    html += `</div>`;
+    html += `</div>`;
+  });
+
+  document.getElementById('calendar').innerHTML = html;
+
+  // Summary
+  const summExpo = events.filter(e=>e.type==='expo');
+  const summPromo = events.filter(e=>e.type==='promo');
+  const summNewp = events.filter(e=>e.type==='newp');
+  const summFest = events.filter(e=>e.type==='fest');
+
+  document.getElementById('summary').innerHTML = `
+    ${summNewp.length ? `<div class="s-card"><h3>🆕 新品到仓</h3><p>${summNewp.map(e=>formatDateRange(e.date,e.endDate)+'&nbsp;&nbsp;'+e.title).join('<br>')}</p></div>` : ''}
+    ${summExpo.length ? `<div class="s-card"><h3>🎪 展会</h3><p>${summExpo.map(e=>formatDateRange(e.date,e.endDate)+'&nbsp;&nbsp;'+e.title+(e.desc?' —— '+e.desc:'')).join('<br>')}</p></div>` : ''}
+    ${summPromo.length ? `<div class="s-card"><h3>📢 促销</h3><p>${summPromo.map(e=>formatDateRange(e.date,e.endDate)+'&nbsp;&nbsp;'+e.title+(e.desc?' —— '+e.desc:'')).join('<br>')}</p></div>` : ''}
+    ${summFest.length ? `<div class="s-card"><h3>🎉 节日</h3><p>${summFest.map(e=>formatDateRange(e.date,e.endDate)+'&nbsp;&nbsp;'+e.title+(e.desc?' —— '+e.desc:'')).join('<br>')}</p></div>` : ''}
+  `;
+}
+
+function formatDateRange(date, endDate) {
+  if (!endDate) return date;
+  const sd = new Date(date+'T00:00:00');
+  const ed = new Date(endDate+'T00:00:00');
+  if (sd.getMonth() === ed.getMonth())
+    return `${sd.getMonth()+1}/${sd.getDate()}–${ed.getDate()}`;
+  return `${sd.getMonth()+1}/${sd.getDate()}→${ed.getMonth()+1}/${ed.getDate()}`;
+}
+
+// Edit functions
+function toggleEdit() {
+  const panel = document.getElementById('editPanel');
+  const btn = document.getElementById('editBtn');
+  panel.classList.toggle('show');
+  btn.textContent = panel.classList.contains('show') ? '✏️ 收起编辑' : '✏️ 编辑';
+  if (panel.classList.contains('show')) renderEditTable();
+}
+
+function renderEditTable() {
+  const tbody = document.querySelector('#eventTable tbody');
+  tbody.innerHTML = events.map((e,i) => `
+    <tr>
+      <td><span class="type-dot ${e.type}"></span>${TYPE_LABELS[e.type]}</td>
+      <td>${e.date}</td>
+      <td>${e.endDate || '—'}</td>
+      <td>${e.title}</td>
+      <td>${e.desc || '—'}</td>
+      <td class="row-actions">
+        <button class="btn small" onclick="editRow(${i})">编辑</button>
+        <button class="btn small danger" onclick="deleteRow(${i})">删除</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function addEvent() {
+  const type = document.getElementById('editType').value;
+  const date = document.getElementById('editDate').value;
+  const endDate = document.getElementById('editEndDate').value;
+  const title = document.getElementById('editTitle').value.trim();
+  const desc = document.getElementById('editDesc').value.trim();
+
+  if (!date || !title) { toast('请填写日期和标题'); return; }
+
+  events.push({ type, date, endDate, title, desc });
+  events.sort((a,b) => a.date.localeCompare(b.date));
+  saveData();
+  clearForm();
+  buildCalendar();
+  renderEditTable();
+  toast('已添加 ✓');
+}
+
+function deleteRow(i) {
+  if (!confirm('确定删除「' + events[i].title + '」？')) return;
+  events.splice(i, 1);
+  saveData();
+  buildCalendar();
+  renderEditTable();
+  toast('已删除');
+}
+
+function editRow(i) {
+  const e = events[i];
+  document.getElementById('editType').value = e.type;
+  document.getElementById('editDate').value = e.date;
+  document.getElementById('editEndDate').value = e.endDate || '';
+  document.getElementById('editTitle').value = e.title;
+  document.getElementById('editDesc').value = e.desc || '';
+  events.splice(i, 1);
+  saveData();
+  buildCalendar();
+  renderEditTable();
+  toast('已载入编辑区，修改后点添加');
+}
+
+function clearForm() {
+  document.getElementById('editDate').value = '';
+  document.getElementById('editEndDate').value = '';
+  document.getElementById('editTitle').value = '';
+  document.getElementById('editDesc').value = '';
+}
+
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(events, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'GEO_2026日历数据.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('已导出 JSON');
+}
+
+function importJSON(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function() {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!Array.isArray(data)) throw new Error('格式错误');
+      events = data;
+      events.sort((a,b) => a.date.localeCompare(b.date));
+      saveData();
+      buildCalendar();
+      if (document.getElementById('editPanel').classList.contains('show')) renderEditTable();
+      toast(`已导入 ${events.length} 条数据 ✓`);
+    } catch(err) {
+      toast('导入失败：JSON 格式不正确');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// Init
+buildCalendar();
+</script>
+</body>
+</html>
