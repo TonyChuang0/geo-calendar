@@ -29,21 +29,7 @@
   .l-dot.fest { background: #ef4444; } .l-dot.newp { background: #10b981; }
 
   /* Edit Panel */
-  .edit-panel { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.05); display: none; }
-  .edit-panel.show { display: block; }
-  .edit-panel h3 { font-size: 16px; margin-bottom: 16px; }
-  .form-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; align-items: flex-end; }
-  .form-row input, .form-row select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; font-family: inherit; }
-  .form-row input[type="date"] { width: 150px; }
-  .form-row input[type="text"] { flex: 1; min-width: 200px; }
 
-  .event-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; }
-  .event-table th { text-align: left; padding: 10px 12px; background: #f9fafb; color: #6b7280; font-weight: 500; border-bottom: 1px solid #e5e7eb; }
-  .event-table td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
-  .event-table .type-dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
-  .type-dot.expo { background: #2563eb; } .type-dot.promo { background: #f59e0b; }
-  .type-dot.fest { background: #ef4444; } .type-dot.newp { background: #10b981; }
-  .row-actions { display: flex; gap: 6px; }
 
   /* Calendar */
   .calendar { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
@@ -99,17 +85,15 @@
 <div class="header">
   <div class="header-left">
     <h1>GEO 2026 H2 关键节点</h1>
-    <p class="sub">展会 · 促销 · 节日 · 新品 | 点击「编辑」增删改项目，自动更新挂历</p>
+    <p class="sub">展会 · 促销 · 节日 · 新品 | 数据源：Google Sheets（多人实时协作）</p>
   </div>
   <img class="header-logo" src="GEO_logo.png" alt="Good Earth Oils">
 </div>
 
 <div class="toolbar">
-  <button class="btn primary" onclick="toggleEdit()" id="editBtn">✏️ 编辑</button>
-  <button class="btn" onclick="exportJSON()">📤 导出 JSON</button>
-  <button class="btn" onclick="document.getElementById('importFile').click()">📥 导入 JSON</button>
-  <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
-  <button class="btn" onclick="window.print()">🖨️ 打印</button>
+  <button class="btn" onclick="loadFromSheet()">🔄 刷新</button>
+  <span style="font-size:12px;color:#999;margin-left:8px" id="refreshInfo"></span>
+  <span style="margin-left:auto;font-size:12px;color:#999">编辑→<a href="https://docs.google.com/spreadsheets/d/1d5X3DtDiTuk85wHoRRi-aSZJjalREQVOgOtioBifxN8/edit" target="_blank" style="color:#2563eb">Google Sheets</a></span>
 </div>
 
 <div class="legend">
@@ -119,23 +103,6 @@
   <span><span class="l-dot newp"></span> 新品到仓</span>
 </div>
 
-<!-- Edit Panel -->
-<div class="edit-panel" id="editPanel">
-  <h3>📝 编辑节点</h3>
-  <div class="form-row">
-    <select id="editType"><option value="expo">展会</option><option value="promo">促销</option><option value="fest">节日</option><option value="newp">新品到仓</option></select>
-    <input type="date" id="editDate" placeholder="日期">
-    <input type="date" id="editEndDate" placeholder="结束日期（可空）">
-    <input type="text" id="editTitle" placeholder="标题（如：深圳礼品展秋季）">
-    <input type="text" id="editDesc" placeholder="描述（可空）">
-    <button class="btn primary" onclick="addEvent()">➕ 添加</button>
-  </div>
-  <table class="event-table" id="eventTable">
-    <thead><tr><th>类型</th><th>日期</th><th>结束</th><th>标题</th><th>描述</th><th>操作</th></tr></thead>
-    <tbody></tbody>
-  </table>
-</div>
-
 <div class="calendar" id="calendar"></div>
 
 <div class="summary" id="summary"></div>
@@ -143,39 +110,53 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const TYPE_LABELS = { expo: '展会', promo: '促销', fest: '节日', newp: '新品' };
+const SHEET_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQyB0heDXoqSEpJw_jUMv7Of_VILcm1MCldp4Y9a1PI1GpKeDl02BBFNCKRhFqBPYcqrdZxPDrgqx0B/pub?output=csv';
+const TYPE_TRANSLATE = { '展会': 'expo', '促销': 'promo', '节日': 'fest', '新品': 'newp' };
+let events = [];
 
-const DEFAULT_DATA = [
-  { type: 'newp', date: '2026-07-15', endDate: '', title: '2L冷榨芥花籽油 · 500ml特级初榨芥花籽油', desc: '' },
-  { type: 'newp', date: '2026-07-15', endDate: '', title: '500ml特级初榨橄榄油 · 4L特级初榨橄榄油', desc: '' },
-  { type: 'promo', date: '2026-08-01', endDate: '', title: '中秋促销启动', desc: '京东活动报名 · 礼盒优先 · 小红书种草' },
-  { type: 'expo', date: '2026-09-03', endDate: '2026-09-05', title: 'Sial 广州食品展', desc: 'TIQ暂定 · 进口食品专业展' },
-  { type: 'newp', date: '2026-09-15', endDate: '', title: '500ml牛油果油 · 500ml礼盒装', desc: '' },
-  { type: 'fest', date: '2026-09-25', endDate: '', title: '中秋节', desc: '促销收尾 · 礼品渠道冲刺' },
-  { type: 'expo', date: '2026-10-20', endDate: '2026-10-23', title: '深圳礼品展秋季', desc: '友商联合 · 礼盒/集采渠道' },
-  { type: 'expo', date: '2026-11-05', endDate: '2026-11-10', title: '上海进博会 CIIE', desc: '全年最重要 · 国家馆背书' },
-  { type: 'promo', date: '2026-12-15', endDate: '', title: '春节促销启动', desc: '年货季 · 礼盒+4L双线 · 京东年货节' },
-  { type: 'fest', date: '2027-02-06', endDate: '', title: '春节', desc: '促销收尾' },
-];
-
-let events = loadData();
-
-function loadData() {
-  try {
-    const saved = localStorage.getItem('geo_calendar_data');
-    if (saved) return JSON.parse(saved);
-  } catch(e) {}
-  return JSON.parse(JSON.stringify(DEFAULT_DATA));
+// Parse CSV from Google Sheets
+function parseCSV(csv) {
+  const lines = csv.trim().split('\n');
+  if (lines.length < 2) return [];
+  return lines.slice(1).map(line => {
+    // Handle commas within quoted fields
+    const cols = [];
+    let col = '', inQuotes = false;
+    for (let c of line) {
+      if (c === '"') { inQuotes = !inQuotes; continue; }
+      if (c === ',' && !inQuotes) { cols.push(col.trim()); col = ''; continue; }
+      col += c;
+    }
+    cols.push(col.trim());
+    return {
+      type: TYPE_TRANSLATE[cols[0]] || 'promo',
+      date: cols[1] || '',
+      endDate: cols[2] || '',
+      title: cols[3] || '',
+      desc: cols[4] || ''
+    };
+  }).filter(e => e.date && e.title);
 }
 
-function saveData() {
-  localStorage.setItem('geo_calendar_data', JSON.stringify(events));
+async function loadFromSheet() {
+  try {
+    const resp = await fetch(SHEET_CSV + '&_=' + Date.now());
+    const csv = await resp.text();
+    events = parseCSV(csv);
+    events.sort((a,b) => a.date.localeCompare(b.date));
+    buildCalendar();
+    const now = new Date();
+    document.getElementById('refreshInfo').textContent = `已刷新 ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+  } catch(e) {
+    console.error('加载失败', e);
+  }
 }
 
 function getMonthKey(y, m) { return `${y}-${m}`; }
 
 function buildCalendar() {
-  // Determine month range from events
+  if (events.length === 0) { document.getElementById('calendar').innerHTML = '<p style="color:#999;text-align:center;padding:40px">加载数据中…</p>'; return; }
+
   let minDate = null, maxDate = null;
   events.forEach(e => {
     const d = new Date(e.date + 'T00:00:00');
@@ -188,31 +169,24 @@ function buildCalendar() {
   });
   if (!minDate || !maxDate) return;
 
-  // Extend to month boundaries
   let startY = minDate.getFullYear(), startM = minDate.getMonth() + 1;
   let endY = maxDate.getFullYear(), endM = maxDate.getMonth() + 1;
 
-  // Build month data
   const months = [];
   let y = startY, m = startM;
   while (y < endY || (y === endY && m <= endM)) {
     months.push({ year: y, month: m });
-    m++;
-    if (m > 12) { m = 1; y++; }
+    m++; if (m > 12) { m = 1; y++; }
   }
 
-  // Index events by date string (single day) + range
-  const dayMarkers = {}; // "2026-07-15" => ['newp','newp']
-  const monthEvents = {}; // "2026-7" => [{type,date,endDate,title,desc}]
+  const dayMarkers = {};
+  const monthEvents = {};
   events.forEach(e => {
     const mk = `${new Date(e.date+'T00:00:00').getFullYear()}-${new Date(e.date+'T00:00:00').getMonth()+1}`;
     if (!monthEvents[mk]) monthEvents[mk] = [];
     monthEvents[mk].push(e);
-
-    // Mark days
     if (!dayMarkers[e.date]) dayMarkers[e.date] = [];
     if (!dayMarkers[e.date].includes(e.type)) dayMarkers[e.date].push(e.type);
-
     if (e.endDate) {
       const start = new Date(e.date + 'T00:00:00');
       const end = new Date(e.endDate + 'T00:00:00');
@@ -228,22 +202,20 @@ function buildCalendar() {
   });
 
   const weekdays = ['一','二','三','四','五','六','日'];
-  const monthNames = ['1','2','3','4','5','6','7','8','9','10','11','12'];
 
   let html = '';
   months.forEach(({year, month}) => {
     const mk = getMonthKey(year, month);
     const mEvts = monthEvents[mk] || [];
-    const firstDay = new Date(year, month-1, 1).getDay(); // 0=Sun
+    const firstDay = new Date(year, month-1, 1).getDay();
     const daysInMonth = new Date(year, month, 0).getDate();
-    const adjFirstDay = firstDay === 0 ? 6 : firstDay - 1; // Mon=0
+    const adjFirstDay = firstDay === 0 ? 6 : firstDay - 1;
 
     html += `<div class="month">`;
-    html += `<div class="month-header">${monthNames[month-1]}月 <span class="year">${year}</span></div>`;
+    html += `<div class="month-header">${month}月 <span class="year">${year}</span></div>`;
     html += `<div class="month-body">`;
     html += `<div class="weekdays">${weekdays.map(w=>`<span>${w}</span>`).join('')}</div>`;
     html += `<div class="days">`;
-
     for (let i = 0; i < adjFirstDay; i++) html += `<span class="day empty"></span>`;
     for (let d = 1; d <= daysInMonth; d++) {
       const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
@@ -260,7 +232,6 @@ function buildCalendar() {
       html += `<span class="${cls}">${inner}</span>`;
     }
     html += `</div></div>`;
-
     html += `<div class="events-panel">`;
     if (mEvts.length > 0) {
       mEvts.forEach(e => {
@@ -270,151 +241,38 @@ function buildCalendar() {
     } else {
       html += `<div class="evt" style="color:#ccc;font-style:italic">暂无节点</div>`;
     }
-    html += `</div>`;
-    html += `</div>`;
+    html += `</div></div>`;
   });
-
   document.getElementById('calendar').innerHTML = html;
 
-  // Summary
   const summExpo = events.filter(e=>e.type==='expo');
   const summPromo = events.filter(e=>e.type==='promo');
   const summNewp = events.filter(e=>e.type==='newp');
   const summFest = events.filter(e=>e.type==='fest');
+  document.getElementById('summary').innerHTML = [
+    summNewp.length ? card('🆕 新品到仓', summNewp) : '',
+    summExpo.length ? card('🎪 展会', summExpo) : '',
+    summPromo.length ? card('📢 促销', summPromo) : '',
+    summFest.length ? card('🎉 节日', summFest) : '',
+  ].join('');
 
-  document.getElementById('summary').innerHTML = `
-    ${summNewp.length ? `<div class="s-card"><h3>🆕 新品到仓</h3><p>${summNewp.map(e=>formatDateRange(e.date,e.endDate)+'&nbsp;&nbsp;'+e.title).join('<br>')}</p></div>` : ''}
-    ${summExpo.length ? `<div class="s-card"><h3>🎪 展会</h3><p>${summExpo.map(e=>formatDateRange(e.date,e.endDate)+'&nbsp;&nbsp;'+e.title+(e.desc?' —— '+e.desc:'')).join('<br>')}</p></div>` : ''}
-    ${summPromo.length ? `<div class="s-card"><h3>📢 促销</h3><p>${summPromo.map(e=>formatDateRange(e.date,e.endDate)+'&nbsp;&nbsp;'+e.title+(e.desc?' —— '+e.desc:'')).join('<br>')}</p></div>` : ''}
-    ${summFest.length ? `<div class="s-card"><h3>🎉 节日</h3><p>${summFest.map(e=>formatDateRange(e.date,e.endDate)+'&nbsp;&nbsp;'+e.title+(e.desc?' —— '+e.desc:'')).join('<br>')}</p></div>` : ''}
-  `;
+  function card(title, items) {
+    return `<div class="s-card"><h3>${title}</h3><p>${items.map(e=>formatDateRange(e.date,e.endDate)+'&nbsp;&nbsp;'+e.title+(e.desc?' —— '+e.desc:'')).join('<br>')}</p></div>`;
+  }
 }
 
 function formatDateRange(date, endDate) {
   if (!endDate) return date;
   const sd = new Date(date+'T00:00:00');
   const ed = new Date(endDate+'T00:00:00');
-  if (sd.getMonth() === ed.getMonth())
-    return `${sd.getMonth()+1}/${sd.getDate()}–${ed.getDate()}`;
+  if (sd.getMonth() === ed.getMonth()) return `${sd.getMonth()+1}/${sd.getDate()}–${ed.getDate()}`;
   return `${sd.getMonth()+1}/${sd.getDate()}→${ed.getMonth()+1}/${ed.getDate()}`;
 }
 
-// Edit functions
-function toggleEdit() {
-  const panel = document.getElementById('editPanel');
-  const btn = document.getElementById('editBtn');
-  panel.classList.toggle('show');
-  btn.textContent = panel.classList.contains('show') ? '✏️ 收起编辑' : '✏️ 编辑';
-  if (panel.classList.contains('show')) renderEditTable();
-}
-
-function renderEditTable() {
-  const tbody = document.querySelector('#eventTable tbody');
-  tbody.innerHTML = events.map((e,i) => `
-    <tr>
-      <td><span class="type-dot ${e.type}"></span>${TYPE_LABELS[e.type]}</td>
-      <td>${e.date}</td>
-      <td>${e.endDate || '—'}</td>
-      <td>${e.title}</td>
-      <td>${e.desc || '—'}</td>
-      <td class="row-actions">
-        <button class="btn small" onclick="editRow(${i})">编辑</button>
-        <button class="btn small danger" onclick="deleteRow(${i})">删除</button>
-      </td>
-    </tr>
-  `).join('');
-}
-
-function addEvent() {
-  const type = document.getElementById('editType').value;
-  const date = document.getElementById('editDate').value;
-  const endDate = document.getElementById('editEndDate').value;
-  const title = document.getElementById('editTitle').value.trim();
-  const desc = document.getElementById('editDesc').value.trim();
-
-  if (!date || !title) { toast('请填写日期和标题'); return; }
-
-  events.push({ type, date, endDate, title, desc });
-  events.sort((a,b) => a.date.localeCompare(b.date));
-  saveData();
-  clearForm();
-  buildCalendar();
-  renderEditTable();
-  toast('已添加 ✓');
-}
-
-function deleteRow(i) {
-  if (!confirm('确定删除「' + events[i].title + '」？')) return;
-  events.splice(i, 1);
-  saveData();
-  buildCalendar();
-  renderEditTable();
-  toast('已删除');
-}
-
-function editRow(i) {
-  const e = events[i];
-  document.getElementById('editType').value = e.type;
-  document.getElementById('editDate').value = e.date;
-  document.getElementById('editEndDate').value = e.endDate || '';
-  document.getElementById('editTitle').value = e.title;
-  document.getElementById('editDesc').value = e.desc || '';
-  events.splice(i, 1);
-  saveData();
-  buildCalendar();
-  renderEditTable();
-  toast('已载入编辑区，修改后点添加');
-}
-
-function clearForm() {
-  document.getElementById('editDate').value = '';
-  document.getElementById('editEndDate').value = '';
-  document.getElementById('editTitle').value = '';
-  document.getElementById('editDesc').value = '';
-}
-
-function exportJSON() {
-  const blob = new Blob([JSON.stringify(events, null, 2)], {type: 'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'GEO_2026日历数据.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  toast('已导出 JSON');
-}
-
-function importJSON(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function() {
-    try {
-      const data = JSON.parse(reader.result);
-      if (!Array.isArray(data)) throw new Error('格式错误');
-      events = data;
-      events.sort((a,b) => a.date.localeCompare(b.date));
-      saveData();
-      buildCalendar();
-      if (document.getElementById('editPanel').classList.contains('show')) renderEditTable();
-      toast(`已导入 ${events.length} 条数据 ✓`);
-    } catch(err) {
-      toast('导入失败：JSON 格式不正确');
-    }
-  };
-  reader.readAsText(file);
-  e.target.value = '';
-}
-
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2000);
-}
-
 // Init
-buildCalendar();
+loadFromSheet();
+// Auto-refresh every 60 seconds
+setInterval(loadFromSheet, 60000);
 </script>
 </body>
 </html>
